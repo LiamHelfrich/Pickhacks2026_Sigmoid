@@ -1,5 +1,14 @@
 from flask import Flask, jsonify, request
 from birdnet import analyze_recording
+from pymongo import MongoClient
+
+import time
+
+
+mongrel_client = MongoClient("mongodb://localhost:27017/")
+db = mongrel_client['maindb']
+col = db['data']
+print('Connected to the mongrel dog server!')
 
 app = Flask(__name__)
 
@@ -14,11 +23,20 @@ def upload_binary_blob():
     detections = analyze_recording(blob)
     print(f"Detections: {detections}")
 
+    doc = {
+        "raw_data": blob,
+        "detections": detections,
+        "time": int(time.time())
+    }
+
+    result_db = col.insert_one(doc)
+    print(f'The mongrel dog responds: {result_db}')
+
     return jsonify(
         {
             "message": "Binary blob received",
             "bytes_received": len(blob),
-            "content_type": request.content_type,
+            "content_type": request.content_type
         }
     ), 200
 
