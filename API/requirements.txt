@@ -4,5 +4,10 @@ birdnetlib
 tensorflow
 librosa
 resampy
-imageio-ffmpeg
 pymongo
+diffusers
+transformers
+accelerate
+torch
+sentencepiece
+protobuf
