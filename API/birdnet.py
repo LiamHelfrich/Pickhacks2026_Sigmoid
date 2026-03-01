@@ -5,23 +5,39 @@ import tempfile
 import os
 import wave
 from pydub import AudioSegment
+from collections import deque
 
 # Load and initialize the BirdNET-Analyzer models.
 analyzer = Analyzer()
 
-SAMPLE_RATE = 8000
+SAMPLE_RATE = 32000
 CHANNELS = 1
 SAMPLE_WIDTH_BYTES = 2
+BUFFER_SIZE = 1
+
+# Rolling buffer of raw PCM payloads
+_audio_buffer: deque[bytes] = deque(maxlen=BUFFER_SIZE)
+
+# Stored results from the last inference run
+last_detections: list = []
+last_mp3_bytes: bytes = b""
+
 
 def analyze_recording(binary_audio: bytes) -> tuple[list, bytes]:
-    # Parse raw PCM16LE audio into a valid .wav file and save it to a temporary file.
+    global last_detections, last_mp3_bytes
+
+    _audio_buffer.append(binary_audio)
+
+    # Concatenate all buffered payloads
+    combined_audio = b"".join(_audio_buffer)
+
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_audio_file:
         wav_path = temp_audio_file.name
         with wave.open(temp_audio_file, "wb") as wav_file:
             wav_file.setnchannels(CHANNELS)
             wav_file.setsampwidth(SAMPLE_WIDTH_BYTES)
             wav_file.setframerate(SAMPLE_RATE)
-            wav_file.writeframes(binary_audio)
+            wav_file.writeframes(combined_audio)
         temp_audio_file.flush()
 
         recording = Recording(
@@ -46,4 +62,8 @@ def analyze_recording(binary_audio: bytes) -> tuple[list, bytes]:
         if os.path.exists(mp3_path):
             os.remove(mp3_path)
 
-    return recording.detections, mp3_bytes
+    # Store results
+    last_detections = recording.detections
+    last_mp3_bytes = mp3_bytes
+
+    return last_detections, last_mp3_bytes

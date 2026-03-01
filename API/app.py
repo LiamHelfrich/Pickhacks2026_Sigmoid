@@ -1,11 +1,14 @@
 from flask import Flask, jsonify, request
 from birdnet import analyze_recording
 from pymongo import MongoClient
+from bson import ObjectId
+from flask_cors import CORS
 # from diffusers import StableDiffusion3Pipeline
 # import torch
 import time
 import io
 import os
+import random
 
 # Point all HuggingFace/diffusers cache to storage partition
 # os.environ.setdefault("HF_HOME", "/mnt/big/huggingface")
@@ -65,6 +68,10 @@ def pick_best_detection(detections: list) -> dict | None:
 
 app = Flask(__name__)
 
+
+CORS(app, resources={r"/*": {"origins": "*"}}, expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"])
+
+
 @app.post("/upload")
 def upload_binary_blob():
     blob = request.get_data(cache=False, as_text=False)
@@ -95,11 +102,16 @@ def upload_binary_blob():
         "detections": detections,
         "time": int(time.time()),
         "bird_image_png": bird_image_png,          # None if generation failed/no detections
+        "lat": 37.9549007 + random.uniform(0.0002,-0.0002),
+        "lon": -91.776418 + random.uniform(0.0002,-0.0002)
         # "generated_for": best["common_name"] if best else None,
     }
 
-    result_db = col.insert_one(doc)
-    print(f'The mongrel dog responds: {result_db}')
+    if detections != []:
+        result_db = col.insert_one(doc)
+        print(f'The mongrel dog responds: {result_db}')
+    else:
+        print('Nothing to report, sir!')
 
     return jsonify(
         {
@@ -110,6 +122,49 @@ def upload_binary_blob():
         }
     ), 200
 
+@app.get("/detections/<doc_id>")
+def get_detection_by_id(doc_id):
+    doc = col.find_one({"_id": ObjectId(doc_id)}, {"_id": 0, "detections": 1, "time": 1, "lat": 1, "lon": 1})
+    if doc is None:
+        return jsonify({"error": "Document not found"}), 404
+    return jsonify(doc)
+
+from flask import send_file
+import io
+
+
+@app.get("/detections/<doc_id>/audio")
+def get_detection_audio(doc_id):
+    try:
+        oid = ObjectId(doc_id)
+    except Exception:
+        return jsonify({"error": "Invalid document id"}), 400
+
+    doc = col.find_one({"_id": oid}, {"mp3_data": 1})
+    if not doc or not doc.get("mp3_data"):
+        return jsonify({"error": "Audio not found"}), 404
+
+    mp3_bytes = bytes(doc["mp3_data"])
+    bio = io.BytesIO(mp3_bytes)
+    bio.seek(0)
+
+    resp = send_file(
+        bio,
+        mimetype="audio/mpeg",
+        as_attachment=False,
+        download_name=f"{doc_id}.mp3",
+        conditional=True,   # ✅ enables Range requests -> 206
+        max_age=0
+    )
+
+    # Explicitly advertise range support (usually added automatically)
+    resp.headers["Accept-Ranges"] = "bytes"
+    return resp
+
+@app.get("/uids")
+def get_uids():
+    docs = col.find({}, {"_id": 1})
+    return jsonify([str(doc["_id"]) for doc in docs])
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)

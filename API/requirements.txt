@@ -5,9 +5,4 @@ tensorflow
 librosa
 resampy
 pymongo
-diffusers
-transformers
-accelerate
-torch
-sentencepiece
-protobuf
+flask_cors
