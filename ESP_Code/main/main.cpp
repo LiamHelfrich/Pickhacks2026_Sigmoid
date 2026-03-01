@@ -12,8 +12,8 @@
 
 #define I2S_SEL_GPIO GPIO_NUM_7
 #define I2S_LRCL_GPIO GPIO_NUM_6
-#define I2S_DOUT_GPIO GPIO_NUM_4
 #define I2S_BCLK_GPIO GPIO_NUM_5
+#define I2S_DOUT_GPIO GPIO_NUM_4
 
 static MicUploaderConfig mic_uploader_config = {
 	.endpoint = "http://66.42.127.17:5000/upload",
