@@ -1,0 +1,17 @@
+menu "Microphone Uploader"
+
+config MIC_SAMPLE_RATE_HZ
+	int "Microphone sample rate (Hz)"
+	default 8000
+	range 1000 48000
+	help
+		Sample rate used by the I2S microphone capture path.
+
+config MIC_UPLOAD_WINDOW_SEC
+	int "Audio upload window (seconds)"
+	default 10
+	range 1 60
+	help
+		Maximum audio capture window used to size the static upload buffer.
+
+endmenu
